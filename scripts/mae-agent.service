@@ -1,0 +1,18 @@
+[Unit]
+Description=MAE Agentic Employee Service
+After=network.target
+
+[Service]
+Type=simple
+User=<user>
+WorkingDirectory=/path/to/mae
+# Using a wrapper script to handle conda activation
+ExecStart=/bin/bash /path/to/mae/scripts/run_agent.sh
+Restart=always
+RestartSec=10
+# Environment variables
+Environment=PYTHONUNBUFFERED=1
+# Add any other necessary environment variables here
+
+[Install]
+WantedBy=multi-user.target

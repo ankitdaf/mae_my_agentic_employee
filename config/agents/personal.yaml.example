@@ -1,0 +1,63 @@
+# Example Agent Configuration for MAE
+# Copy this file to create your own agent configuration:
+#   cp personal.yaml.example personal.yaml
+# 
+# Edit the values and place OAuth credentials in config/secrets/
+
+agent:
+  name: "personal"                    # Unique identifier for this agent
+  schedule_interval_minutes: 15       # How often to process emails (minutes)
+  enabled: true                       # Set to false to disable this agent
+
+email:
+  provider: "gmail"                   # Currently only 'gmail' is supported
+  address: "your-email@gmail.com"     # Your Gmail address
+  # OAuth tokens will be stored in: data/personal/oauth_tokens.json
+
+classification:
+  use_ai_model: true
+  model_path: "models/email_classifier.rknn"
+  tokenizer_path: "models/tokenizer"
+
+  # Topics you care about - promotional emails mentioning these won't be deleted
+  topics_i_care_about:
+    - "machine learning"
+    - "artificial intelligence"
+    - "kubernetes"
+    - "docker"
+    - "family"
+    - "friends"
+  
+  # Senders/domains that should never be deleted
+  # Supports wildcards: *@company.com matches all emails from company.com
+  whitelisted_senders:
+    - "important-person@example.com"
+    - "*@mycompany.com"
+    - "noreply@github.com"
+  
+  # Senders/domains to always delete if old (overrides topics)
+  blacklisted_senders:
+    - "spam@promotions.com"
+    - "*@marketing.example.com"
+
+# Email Deletion Settings
+deletion:
+  # Action to take on emails identified for deletion
+  # Supported: 'move_to_trash' or 'apply_label'
+  action_on_deletion: "move_to_trash"
+  
+  # Delete old promotional emails (only promotional emails can be deleted)
+  # Important and normal emails are NEVER deleted
+  delete_promotional: true
+  
+  # Dry-run mode (test without actual deletion - HIGHLY RECOMMENDED for first run)
+  dry_run: true                       # IMPORTANT: Set to false to actually delete emails
+
+calendar:
+  enabled: false                      # Set to true to enable calendar integration
+  # OAuth tokens will be stored in: data/personal/gcal_tokens.json
+  # See docs/google_calendar_setup.md for credential setup
+
+logging:
+  level: "INFO"                       # DEBUG, INFO, WARNING, ERROR
+  file: "logs/personal.log"           # Log file path

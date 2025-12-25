@@ -1,0 +1,28 @@
+# MAE Email Processing - Python Dependencies
+
+# Core dependencies
+pyyaml>=6.0                          # YAML configuration parsing
+python-dateutil>=2.8.2               # Date parsing utilities
+
+# Email processing
+google-auth>=2.25.0                  # Google OAuth 2.0
+google-auth-oauthlib>=1.2.0          # OAuth flow helpers
+google-auth-httplib2>=0.2.0          # HTTP transport for auth
+google-api-python-client>=2.110.0    # Google Calendar API
+email-validator>=2.1.0               # Email address validation
+
+# AI/ML (for classification)
+numpy>=1.24.0                        # Numerical operations
+# Note: rknn-toolkit-lite2 must be installed separately on RK3566
+# See docs/model_conversion.md for instructions
+
+# Web UI
+fastapi>=0.108.0
+uvicorn>=0.25.0
+pydantic>=2.5.0
+
+# Development and testing
+pytest>=7.4.0                        # Testing framework
+pytest-cov>=4.1.0                    # Coverage reporting
+black>=23.12.0                       # Code formatting
+flake8>=7.0.0                        # Linting

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAE Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+</head>
+
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="fas fa-robot"></i> MAE Manager
+            </div>
+            <div class="agent-list-header">
+                <span>AGENTS</span>
+                <button id="add-agent-btn" class="icon-btn"><i class="fas fa-plus"></i></button>
+            </div>
+            <ul id="agent-list" class="agent-list">
+                <!-- Agents will be loaded here -->
+            </ul>
+        </aside>
+
+        <main class="main-content">
+            <div id="welcome-screen" class="empty-state">
+                <i class="fas fa-layer-group"></i>
+                <h2>Select an agent to manage</h2>
+            </div>
+
+            <div id="agent-detail" class="agent-detail hidden">
+                <header class="agent-header">
+                    <div class="agent-title">
+                        <h1 id="current-agent-name">Agent Name</h1>
+                        <span id="agent-status-badge" class="status-badge">Enabled</span>
+                    </div>
+                    <div class="agent-actions">
+
+                        <button id="save-btn" class="btn primary"><i class="fas fa-save"></i> Save Config</button>
+                        <button id="delete-btn" class="btn danger"><i class="fas fa-trash"></i></button>
+                    </div>
+                </header>
+
+                <div class="agent-info-bar">
+                    <div class="auth-status">
+                        <i class="fas fa-shield-alt"></i>
+                        <span id="auth-status-text">Checking authentication...</span>
+                        <button id="auth-btn" class="btn small"><i class="fas fa-key"></i> Authenticate Gmail</button>
+                    </div>
+                </div>
+
+                <div class="form-container">
+                    <div id="config-form" class="config-form">
+                        <!-- Dynamic form will be rendered here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="auth-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Gmail Authentication</h3>
+                <button class="close-modal"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <p>1. Click the link below to authorize MAE to access your Gmail:</p>
+                <a id="auth-url" href="#" target="_blank" class="auth-link">Authorize MAE</a>
+
+                <p>2. Paste the verification code you received here:</p>
+                <div class="form-group">
+                    <input type="text" id="auth-code" placeholder="Enter code here...">
+                </div>
+                <div class="form-actions">
+                    <button id="submit-auth-code" class="btn primary">Complete Authentication</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="new-agent-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create New Agent</h3>
+                <button class="close-modal"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Agent Name</label>
+                    <input type="text" id="new-agent-name" placeholder="e.g., personal">
+                </div>
+                <div class="form-actions">
+                    <button id="create-agent-btn" class="btn primary">Create</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

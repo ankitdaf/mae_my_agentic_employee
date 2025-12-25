@@ -1,0 +1,34 @@
+agent:
+  name: test_agent
+  schedule_interval_minutes: 15
+  enabled: false
+email:
+  provider: gmail
+  address: your-email@gmail.com
+classification:
+  use_ai_model: true
+  model_path: models/email_classifier.rknn
+  tokenizer_path: models/tokenizer
+  topics_i_care_about:
+  - machine learning
+  - artificial intelligence
+  - kubernetes
+  - docker
+  - family
+  - friends
+  whitelisted_senders:
+  - important-person@example.com
+  - '*@mycompany.com'
+  - noreply@github.com
+  blacklisted_senders:
+  - spam@promotions.com
+  - '*@marketing.example.com'
+deletion:
+  action_on_deletion: move_to_trash
+  delete_promotional: true
+  dry_run: true
+calendar:
+  enabled: false
+logging:
+  level: INFO
+  file: logs/test_agent.log
