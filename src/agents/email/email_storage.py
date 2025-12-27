@@ -198,8 +198,15 @@ class EmailStorage:
             if not self.state_file.exists():
                 return {}
             
-            with open(self.state_file, 'r') as f:
-                state = json.load(f)
+            if self.state_file.exists():
+                try:
+                    with open(self.state_file, 'r', encoding='utf-8') as f:
+                        state = json.load(f)
+                except (json.JSONDecodeError, UnicodeDecodeError, Exception) as e:
+                    logger.warning(f"[{self.agent_name}] Corrupted state file detected, resetting: {e}")
+                    state = {}
+            else:
+                state = {}
             
             latest = state.get('latest_email', {})
             if not latest:
@@ -228,8 +235,15 @@ class EmailStorage:
             if not self.state_file.exists():
                 return []
             
-            with open(self.state_file, 'r') as f:
-                state = json.load(f)
+            if self.state_file.exists():
+                try:
+                    with open(self.state_file, 'r', encoding='utf-8') as f:
+                        state = json.load(f)
+                except (json.JSONDecodeError, UnicodeDecodeError, Exception) as e:
+                    logger.warning(f"[{self.agent_name}] Corrupted state file detected in get_recent_hashes: {e}")
+                    state = {}
+            else:
+                state = {}
             
             return state.get('recent_hashes', [])
             
@@ -256,8 +270,9 @@ class EmailStorage:
                 with open(self.state_file, 'r') as f:
                     try:
                         state = json.load(f)
-                    except json.JSONDecodeError:
-                        pass
+                    except (json.JSONDecodeError, UnicodeDecodeError):
+                        logger.warning(f"[{self.agent_name}] Failed to decode state file, starting with empty state")
+                        state = {}
             
             # Check if we should update "latest_email" (watermark)
             current_latest = self.get_latest_email_info()
