@@ -4,14 +4,14 @@ An intelligent, lightweight email processing agent designed for the RK3566 singl
 
 ## Features
 
-- **Gmail Integration**: OAuth 2.0 authentication with IMAP email fetching
+- **Gmail Integration**: Support for both **App Passwords** (recommended) and OAuth 2.0 authentication.
 - **AI Classification**: Categorize emails as Transactions, Feed, Promotions, or Inbox (with NPU-accelerated MobileBERT support)
 - **Smart Deletion**: Automatically manage promotional emails with configurable actions (Move to Trash or Apply Label)
 - **Topic Matching**: Preserve promotional emails that match your specific interests
 - **Sender Management**: Whitelist/blacklist with wildcard pattern support
 - **Attachment Handling**: Save important attachments with deduplication
 - **Calendar Integration**: Extract events from emails and add to Google Calendar
-- **Web UI Dashboard**: Manage agents, update configurations, and monitor status via a web interface
+- **Web UI Dashboard**: Manage agents, update configurations, and securely store credentials via a web interface
 - **Historical Processing**: Bulk process and label older emails based on AI classification
 - **Resource Management**: File-based token system prevents resource contention on RK3566
 - **Dry-Run Mode**: Test classification and actions before making any changes
@@ -37,7 +37,7 @@ Resource tokens (NPU, IMAP, CALENDAR) prevent concurrent access to shared resour
 
 1. **RK3566 Device** (or development machine for testing)
 2. **Python 3.8+**
-3. **Gmail Account** with OAuth credentials (see **[OAuth Setup Guide](docs/oauth_setup.md)** for how to get these)
+3. **Gmail Account** with an App Password or OAuth credentials (see **[App Password Guide](docs/gmail_app_password_setup.md)** for the easiest method)
 4. **Google Calendar** (optional, for calendar integration)
 
 ### Installation
@@ -56,10 +56,9 @@ mkdir -p logs data config/secrets
 
 ### Configuration
 
-1. **Get OAuth Credentials**:
-   - You need `gmail_credentials.json` in `config/secrets/`.
-   - **Option 1 (Fast)**: Email **ankitdaf@gmail.com** for help with setting up your own Google Cloud project or for using a pre-configured MAE app.
-   - **Option 2 (Manual)**: Follow the **[OAuth Setup Guide](docs/oauth_setup.md)** to create your own Google Cloud project.
+1. **Setup Authentication**:
+   - **Option 1 (Easiest)**: Follow the **[App Password Setup Guide](docs/gmail_app_password_setup.md)** to generate a password and enter it via the Web UI.
+   - **Option 2 (Advanced)**: Follow the **[OAuth Setup Guide](docs/oauth_setup.md)** to create a Google Cloud project and get a `gmail_credentials.json` file.
 
 2. **Create Agent Config**:
    ```bash
@@ -328,9 +327,9 @@ python3 src/agents/actions/email_deleter.py
 
 ## Documentation
 
-- **[Implementation Plan](docs/implementation_plan.md)**: Technical architecture
-- **[Google Calendar Setup](docs/google_calendar_setup.md)**: OAuth credentials guide
-- **[Module Docs](docs/)**: Detailed implementation notes for each module
+- **[App Password Setup](docs/gmail_app_password_setup.md)**: Simplest authentication guide (Recommended)
+- **[OAuth Setup Guide](docs/oauth_setup.md)**: Alternative Google Cloud authentication guide
+- **[Google Calendar Setup](docs/google_calendar_setup.md)**: Calendar-specific credentials guide
 - **[Future Scope](docs/future_scope.md)**: Planned features
 
 ## Roadmap

@@ -15,8 +15,11 @@ A hybrid approach for promotional email management:
    - Sender/domain is whitelisted
    - Contains topics from user's "care about" list
 
-### OAuth 2.0 for Gmail
-Gmail requires OAuth 2.0 for IMAP access (app passwords being deprecated). OAuth flow with local token storage. Each account needs authorization once via browser.
+### Gmail Authentication
+Support for two authentication methods:
+1. **App Passwords** (Recommended): Simple 16-character password setup for headless environments.
+2. **OAuth 2.0**: Standard OAuth flow with local token storage for users who prefer full API integration.
+Each agent's credentials are stored securely using the system keyring or an encrypted file fallback.
 
 ### Orchestrator Design
 The orchestrator will:
@@ -83,11 +86,12 @@ my-agentic-employee-mae/
 
 ---
 
-### Module 2: Gmail Client + Email Parsing
-**Goal**: Fetch and parse emails from Gmail
+### Module 2: Gmail Client + Authentication
+**Goal**: Implement robust authentication (App Passwords + OAuth 2.0) and email fetching logic.
 
 **Components**:
-- `src/agents/email/gmail_client.py` - OAuth 2.0 + IMAP
+- `src/agents/email/gmail_client.py` - Core IMAP client
+- `src/utils/credential_manager.py` - Secure credential storage
 - `src/agents/email/email_parser.py` - Parse email content
 - `src/agents/email/email_storage.py` - Cache emails locally
 
