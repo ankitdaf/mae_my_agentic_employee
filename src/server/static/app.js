@@ -20,12 +20,22 @@ const newAgentModal = document.getElementById('new-agent-modal');
 const createAgentBtn = document.getElementById('create-agent-btn');
 const newAgentNameInput = document.getElementById('new-agent-name');
 
-const authBtn = document.getElementById('auth-btn');
+const authBtn = document.getElementById('auth-btn');  // Keep for legacy OAuth if needed
+const appPasswordBtn = document.getElementById('app-password-btn');
+
 const authStatusText = document.getElementById('auth-status-text');
 const authModal = document.getElementById('auth-modal');
 const authUrlLink = document.getElementById('auth-url');
 const authCodeInput = document.getElementById('auth-code');
 const submitAuthCodeBtn = document.getElementById('submit-auth-code');
+
+const appPasswordModal = document.getElementById('app-password-modal');
+const saveAppPasswordBtn = document.getElementById('save-app-password-btn');
+const testConnectionBtn = document.getElementById('test-connection-btn');
+const appPasswordEmailInput = document.getElementById('gmail-address');
+const appPasswordInput = document.getElementById('app-password');
+const appPasswordErrorEl = document.getElementById('app-password-error');
+const connectionStatusEl = document.getElementById('connection-status');
 
 // Init
 async function init() {
@@ -224,18 +234,119 @@ async function saveConfig() {
 // Auth Status
 async function checkAuthStatus(name) {
     authStatusText.textContent = 'Checking...';
+    authStatusText.style.color = 'var(--text-secondary)';
+
     try {
+        // Check for app password first
+        const credResponse = await fetch(`${API_BASE}/auth/credentials/${name}`);
+        const credData = await credResponse.json();
+
+        if (credData.configured) {
+            authStatusText.textContent = `App Password: ${credData.email}`;
+            authStatusText.style.color = 'var(--success)';
+            return;
+        }
+
+        // Fallback to OAuth check
         const res = await fetch(`${API_BASE}/auth/status/${name}`);
         const data = await res.json();
         if (data.valid) {
-            authStatusText.textContent = 'Gmail Authenticated';
+            authStatusText.textContent = 'OAuth Authenticated';
             authStatusText.style.color = 'var(--success)';
         } else {
             authStatusText.textContent = 'Authentication Required';
             authStatusText.style.color = 'var(--danger)';
         }
     } catch (err) {
+        console.error('Auth check failed:', err);
         authStatusText.textContent = 'Status Unknown';
+        authStatusText.style.color = 'var(--text-secondary)';
+    }
+}
+
+// Open app password modal
+function openAppPasswordModal() {
+    appPasswordModal.classList.remove('hidden');
+    appPasswordEmailInput.value = '';
+    appPasswordInput.value = '';
+    appPasswordErrorEl.classList.add('hidden');
+    connectionStatusEl.classList.add('hidden');
+}
+
+// Save app password
+async function saveAppPassword() {
+    const email = appPasswordEmailInput.value.trim();
+    const password = appPasswordInput.value.trim();
+
+    appPasswordErrorEl.classList.add('hidden');
+
+    if (!email || !password) {
+        appPasswordErrorEl.textContent = 'Please fill in both email and password';
+        appPasswordErrorEl.classList.remove('hidden');
+        return false;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/auth/credentials/${currentAgent}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, app_password: password })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            appPasswordErrorEl.textContent = data.detail || 'Failed to save credentials';
+            appPasswordErrorEl.classList.remove('hidden');
+            return false;
+        }
+
+        // Success
+        alert('Credentials saved successfully!');
+        appPasswordModal.classList.add('hidden');
+        checkAuthStatus(currentAgent);
+        return true;
+    } catch (error) {
+        appPasswordErrorEl.textContent = 'Network error: ' + error.message;
+        appPasswordErrorEl.classList.remove('hidden');
+        return false;
+    }
+}
+
+// Test connection
+async function testConnection() {
+    connectionStatusEl.textContent = 'Testing connection...';
+    connectionStatusEl.style.background = 'rgba(59, 130, 246, 0.1)';
+    connectionStatusEl.style.color = 'var(--accent)';
+    connectionStatusEl.classList.remove('hidden');
+
+    // First save credentials
+    const saved = await saveAppPassword();
+    if (!saved) {
+        connectionStatusEl.classList.add('hidden');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/auth/test/${currentAgent}`, {
+            method: 'POST'
+        });
+
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            connectionStatusEl.textContent = '✓ ' + data.message;
+            connectionStatusEl.style.background = 'rgba(34, 197, 94, 0.1)';
+            connectionStatusEl.style.color = 'var(--success)';
+        } else {
+            connectionStatusEl.textContent = '✗ ' + data.message;
+            connectionStatusEl.style.background = 'rgba(239, 68, 68, 0.1)';
+            connectionStatusEl.style.color = 'var(--danger)';
+        }
+    } catch (error) {
+        connectionStatusEl.textContent = '✗ Connection test failed: ' + error.message;
+        connectionStatusEl.style.background = 'rgba(239, 68, 68, 0.1)';
+        connectionStatusEl.style.color = 'var(--danger)';
     }
 }
 
@@ -341,17 +452,23 @@ async function deleteAgent() {
 
 // Event Listeners
 function setupEventListeners() {
-    addAgentBtn.onclick = () => newAgentModal.classList.remove('hidden');
-    createAgentBtn.onclick = createAgent;
-    saveBtn.onclick = saveConfig;
-    deleteBtn.onclick = deleteAgent;
+    if (addAgentBtn) addAgentBtn.onclick = () => newAgentModal.classList.remove('hidden');
+    if (createAgentBtn) createAgentBtn.onclick = createAgent;
+    if (saveBtn) saveBtn.onclick = saveConfig;
+    if (deleteBtn) deleteBtn.onclick = deleteAgent;
 
-    authBtn.onclick = initiateAuth;
-    submitAuthCodeBtn.onclick = submitAuthCode;
+    if (authBtn) authBtn.onclick = initiateAuth;
+    if (submitAuthCodeBtn) submitAuthCodeBtn.onclick = submitAuthCode;
+
+    // App Password buttons
+    if (appPasswordBtn) appPasswordBtn.onclick = openAppPasswordModal;
+    if (saveAppPasswordBtn) saveAppPasswordBtn.onclick = saveAppPassword;
+    if (testConnectionBtn) testConnectionBtn.onclick = testConnection;
 
     document.querySelectorAll('.close-modal').forEach(btn => {
         btn.onclick = (e) => {
-            e.target.closest('.modal').classList.add('hidden');
+            const modal = e.target.closest('.modal');
+            if (modal) modal.classList.add('hidden');
         };
     });
 }

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MAE Dashboard</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=2">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
@@ -49,7 +49,8 @@
                     <div class="auth-status">
                         <i class="fas fa-shield-alt"></i>
                         <span id="auth-status-text">Checking authentication...</span>
-                        <button id="auth-btn" class="btn small"><i class="fas fa-key"></i> Authenticate Gmail</button>
+                        <button id="app-password-btn" class="btn small primary"><i class="fas fa-key"></i> Setup App
+                            Password</button>
                     </div>
                 </div>
 
@@ -103,7 +104,57 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <!-- App Password Modal -->
+    <div id="app-password-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Setup Gmail App Password</h3>
+                <button class="close-modal"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 15px; color: var(--text-secondary); font-size: 0.9rem;">
+                    <strong style="color: var(--text-primary);">How to create an App Password:</strong>
+                </p>
+                <ol style="margin: 0 0 20px 20px; color: var(--text-secondary); font-size: 0.85rem; line-height: 1.6;">
+                    <li>Go to <a href="https://myaccount.google.com/apppasswords" target="_blank"
+                            style="color: var(--accent); text-decoration: underline;">Google App Passwords</a></li>
+                    <li>Sign in and create a new password for "Mail"</li>
+                    <li>Copy the 16-character password and paste below</li>
+                </ol>
+
+                <div class="form-group">
+                    <label>Gmail Address</label>
+                    <input type="email" id="gmail-address" placeholder="your-email@gmail.com">
+                </div>
+
+                <div class="form-group">
+                    <label>App Password</label>
+                    <input type="text" id="app-password" placeholder="abcd efgh ijkl mnop" maxlength="19">
+                    <small style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 4px; display: block;">
+                        Spaces and dashes will be removed automatically
+                    </small>
+                </div>
+
+                <div id="app-password-error" class="hidden"
+                    style="color: var(--danger); background: rgba(239, 68, 68, 0.1); padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 0.85rem;">
+                </div>
+
+                <div class="form-actions">
+                    <button id="test-connection-btn" class="btn secondary">
+                        <i class="fas fa-plug"></i> Test Connection
+                    </button>
+                    <button id="save-app-password-btn" class="btn primary">
+                        <i class="fas fa-save"></i> Save
+                    </button>
+                </div>
+
+                <div id="connection-status" class="hidden"
+                    style="margin-top: 15px; padding: 10px; border-radius: 6px; font-size: 0.85rem;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js?v=2"></script>
 </body>
 
 </html>

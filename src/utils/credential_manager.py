@@ -100,7 +100,7 @@ class CredentialManager:
         return fernet_key
     
     @staticmethod
-    def _validate_email(email: str) -> None:
+    def validate_email(email: str) -> None:
         """
         Validate email address format
         
@@ -119,7 +119,7 @@ class CredentialManager:
             raise ValueError(f"Invalid email address format: {email}")
     
     @staticmethod
-    def _validate_password(password: str) -> str:
+    def validate_password(password: str) -> str:
         """
         Validate and normalize app password
         
