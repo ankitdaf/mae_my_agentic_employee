@@ -11,6 +11,7 @@ from pydantic import BaseModel
 import json
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
 
 # Setup logging
 logger = logging.getLogger("mae_server")
@@ -139,8 +140,24 @@ async def get_auth_status(agent_name: str):
             with open(token_path, "r") as f:
                 token_data = json.load(f)
                 creds = Credentials.from_authorized_user_info(token_data)
-                if creds and creds.valid or (creds.expired and creds.refresh_token):
-                    return {"valid": True, "message": "Token found and valid (or refreshable)"}
+                
+                if creds and creds.valid:
+                    return {"valid": True, "message": "Token found and valid"}
+                
+                if creds and creds.expired and creds.refresh_token:
+                    try:
+                        # Attempt to refresh the token to see if it's still valid
+                        creds.refresh(Request())
+                        
+                        # Save the refreshed token
+                        with open(token_path, "w") as f_out:
+                            f_out.write(creds.to_json())
+                        
+                        return {"valid": True, "message": "Token refreshed and valid"}
+                    except Exception as e:
+                        logger.warning(f"Token refresh failed for {agent_name}: {e}")
+                        return {"valid": False, "message": "Token expired and refresh failed"}
+                        
         except Exception as e:
             logger.error(f"Error checking auth status: {e}")
     
