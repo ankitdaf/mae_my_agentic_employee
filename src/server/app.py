@@ -1,6 +1,7 @@
 import os
 import yaml
 import logging
+import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional
 from fastapi import FastAPI, HTTPException, BackgroundTasks
@@ -8,6 +9,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import json
+from google_auth_oauthlib.flow import Flow
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
 
 # Setup logging
 logger = logging.getLogger("mae_server")
@@ -30,6 +34,9 @@ class AgentConfig(BaseModel):
 
 class DryRunRequest(BaseModel):
     target_labels: Optional[str] = None
+
+class AuthCodeRequest(BaseModel):
+    code: str
 
 class AppPasswordRequest(BaseModel):
     email: str
@@ -220,99 +227,6 @@ async def test_connection(agent_name: str):
             "status": "error",
             "message": f"Connection failed: {str(e)}"
         }
-
-# OAuth Authentication (Legacy)
-@app.get("/api/auth/status/{agent_name}")
-async def get_auth_status(agent_name: str):
-    token_path = BASE_DIR / "data" / agent_name / "oauth_tokens.json"
-    if token_path.exists():
-        try:
-            with open(token_path, "r") as f:
-                token_data = json.load(f)
-                creds = Credentials.from_authorized_user_info(token_data)
-                
-                if creds and creds.valid:
-                    return {"valid": True, "message": "Token found and valid"}
-                
-                if creds and creds.expired and creds.refresh_token:
-                    try:
-                        # Attempt to refresh the token to see if it's still valid
-                        creds.refresh(Request())
-                        
-                        # Save the refreshed token
-                        with open(token_path, "w") as f_out:
-                            f_out.write(creds.to_json())
-                        
-                        return {"valid": True, "message": "Token refreshed and valid"}
-                    except Exception as e:
-                        logger.warning(f"Token refresh failed for {agent_name}: {e}")
-                        return {"valid": False, "message": "Token expired and refresh failed"}
-                        
-        except Exception as e:
-            logger.error(f"Error checking auth status: {e}")
-    
-    return {"valid": False, "message": "Authentication required"}
-
-@app.post("/api/auth/initiate/{agent_name}")
-async def initiate_auth(agent_name: str):
-    creds_path = BASE_DIR / "config" / "secrets" / "gmail_credentials.json"
-    if not creds_path.exists():
-        # Fallback to calendar credentials if gmail ones don't exist
-        creds_path = BASE_DIR / "config" / "secrets" / "google_calendar_credentials.json"
-        
-    if not creds_path.exists():
-        raise HTTPException(status_code=404, detail="OAuth credentials file not found in config/secrets/")
-
-    scopes = [
-        'https://www.googleapis.com/auth/gmail.modify',
-        'https://mail.google.com/'
-    ]
-    
-    flow = Flow.from_client_secrets_file(
-        str(creds_path),
-        scopes=scopes,
-        redirect_uri='urn:ietf:wg:oauth:2.0:oob'
-    )
-    
-    auth_url, _ = flow.authorization_url(prompt='consent')
-    return {"auth_url": auth_url}
-
-@app.post("/api/auth/complete/{agent_name}")
-async def complete_auth(agent_name: str, request: AuthCodeRequest):
-    creds_path = BASE_DIR / "config" / "secrets" / "gmail_credentials.json"
-    if not creds_path.exists():
-        creds_path = BASE_DIR / "config" / "secrets" / "google_calendar_credentials.json"
-        
-    if not creds_path.exists():
-        raise HTTPException(status_code=404, detail="OAuth credentials file not found")
-
-    scopes = [
-        'https://www.googleapis.com/auth/gmail.modify',
-        'https://mail.google.com/'
-    ]
-    
-    flow = Flow.from_client_secrets_file(
-        str(creds_path),
-        scopes=scopes,
-        redirect_uri='urn:ietf:wg:oauth:2.0:oob'
-    )
-    
-    try:
-        flow.fetch_token(code=request.code)
-        creds = flow.credentials
-        
-        token_dir = BASE_DIR / "data" / agent_name
-        token_dir.mkdir(parents=True, exist_ok=True)
-        token_path = token_dir / "oauth_tokens.json"
-        
-        with open(token_path, "w") as f:
-            f.write(creds.to_json())
-        
-        os.chmod(token_path, 0o600)
-        return {"status": "success"}
-    except Exception as e:
-        logger.error(f"Failed to complete auth: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
 
 # --- Static Files ---
 
