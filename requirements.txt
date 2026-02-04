@@ -22,6 +22,9 @@ numpy>=1.24.0                        # Numerical operations
 fastapi>=0.108.0
 uvicorn>=0.25.0
 pydantic>=2.5.0
+httpx
+uvicorn>=0.27.0
+uvicorn>=0.27.0
 
 # Development and testing
 pytest>=7.4.0                        # Testing framework

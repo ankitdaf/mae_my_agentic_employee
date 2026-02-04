@@ -91,21 +91,32 @@ class ConfigLoader:
     
     def _validate(self):
         """Validate required fields are present"""
-        for section, fields in self.REQUIRED_FIELDS.items():
-            if section not in self.config:
-                raise ConfigurationError(f"Missing required section: {section}")
+        # Validate required fields are present
+        agent_section = self.config.get('agent', {})
+        if 'name' not in agent_section:
+            raise ConfigurationError("Missing required field: agent.name")
             
-            for field in fields:
-                if field not in self.config[section]:
-                    raise ConfigurationError(
-                        f"Missing required field: {section}.{field}"
-                    )
+        agent_type = agent_section.get('type', 'email')
+        
+        # Common required fields
+        if 'schedule_interval_minutes' not in agent_section:
+             raise ConfigurationError("Missing required field: agent.schedule_interval_minutes")
+             
+        if 'logging' not in self.config:
+             raise ConfigurationError("Missing required section: logging")
+
+        # Type specific validation
+        if agent_type == 'email':
+            if 'email' not in self.config:
+                raise ConfigurationError("Missing required section: email")
+            if 'address' not in self.config['email']:
+                raise ConfigurationError("Missing required field: email.address")
         
         # Validate specific field types and values
         if self.config['agent']['schedule_interval_minutes'] < 1:
             raise ConfigurationError("schedule_interval_minutes must be >= 1")
         
-        if self.config['email']['provider'] not in ['gmail']:
+        if agent_type == 'email' and self.config['email']['provider'] not in ['gmail']:
             logger.warning(
                 f"Email provider '{self.config['email']['provider']}' is not yet supported. "
                 f"Only 'gmail' is currently implemented."
@@ -127,9 +138,7 @@ class ConfigLoader:
         self.agent_data_dir = project_root / 'data' / agent_name
         self.agent_data_dir.mkdir(parents=True, exist_ok=True)
         
-        # Set paths for OAuth tokens
-        self.oauth_token_path = self.agent_data_dir / 'oauth_tokens.json'
-        self.gcal_token_path = self.agent_data_dir / 'gcal_tokens.json'
+        # Set paths for agent data
         self.email_cache_dir = self.agent_data_dir / 'emails'
         self.email_cache_dir.mkdir(exist_ok=True)
     

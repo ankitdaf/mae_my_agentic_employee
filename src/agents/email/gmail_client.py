@@ -1,30 +1,11 @@
-"""
-Gmail Client for MAE
-
-Handles Gmail authentication (OAuth 2.0 and App Password) and IMAP operations.
-Supports fetching, marking, and deleting emails.
-"""
-
-import os
-import json
 import imaplib
 import email
 from email.header import decode_header
-from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 import logging
 
 logger = logging.getLogger(__name__)
-
-try:
-    from google.auth.transport.requests import Request
-    from google.oauth2.credentials import Credentials
-    from google_auth_oauthlib.flow import InstalledAppFlow
-    OAUTH_AVAILABLE = True
-except ImportError:
-    OAUTH_AVAILABLE = False
-    logger.warning("Google OAuth libraries not available. Only app password authentication will work.")
 
 
 class GmailAuthError(Exception):
@@ -38,34 +19,21 @@ class GmailConnectionError(Exception):
 
 
 class GmailClient:
-    """Gmail IMAP client with OAuth 2.0 and App Password authentication"""
+    """Gmail IMAP client with App Password authentication"""
     
     # Gmail IMAP settings
     IMAP_SERVER = "imap.gmail.com"
     IMAP_PORT = 993
     
-    # OAuth 2.0 scopes
-    SCOPES = [
-        'https://www.googleapis.com/auth/gmail.modify',  # Read, send, delete emails
-        'https://mail.google.com/'  # Full mail access for IMAP
-    ]
-    
-    def __init__(self, email_address: str, token_path: Optional[Path] = None, 
-                 credentials_path: Optional[Path] = None, agent_name: str = "unknown",
+    def __init__(self, email_address: str, agent_name: str = "unknown",
                  app_password: Optional[str] = None):
         """
-        Initialize Gmail client with either OAuth or App Password
+        Initialize Gmail client with App Password
         
         Args:
             email_address: Gmail address
-            token_path: Path to store OAuth tokens (OAuth mode only)
-            credentials_path: Path to OAuth credentials JSON (OAuth mode only)
             agent_name: Agent name for logging
-            app_password: 16-character app password (App Password mode only)
-            
-        Note:
-            - If app_password is provided, uses App Password authentication
-            - Otherwise, uses OAuth 2.0 authentication (requires token_path and credentials_path)
+            app_password: 16-character app password
             
         Raises:
             GmailAuthError: If invalid configuration
@@ -74,135 +42,18 @@ class GmailClient:
         self.agent_name = agent_name
         self.imap = None
         
-        # Determine authentication method
-        if app_password:
-            self.auth_method = "app_password"
-            self.app_password = app_password.replace(' ', '').replace('-', '')  # Remove spaces and dashes
-            if len(self.app_password) != 16:
-                raise GmailAuthError(f"App password must be 16 characters (got {len(self.app_password)})")
-            self.credentials = None
-            self.token_path = None
-            self.credentials_path = None
-            logger.info(f"[{agent_name}] Initialized Gmail client for {email_address} (App Password)")
-        else:
-            self.auth_method = "oauth"
-            self.app_password = None
-            self.token_path = token_path
-            self.credentials_path = credentials_path
-            self.credentials = None
+        if not app_password:
+             raise GmailAuthError("App password is required for GmailClient")
+             
+        self.app_password = app_password.replace(' ', '').replace('-', '')  # Remove spaces and dashes
+        if len(self.app_password) != 16:
+            raise GmailAuthError(f"App password must be 16 characters (got {len(self.app_password)})")
             
-            if not OAUTH_AVAILABLE:
-                raise GmailAuthError(
-                    "OAuth authentication requested but google-auth libraries not installed. "
-                    "Please install google-auth, google-auth-oauthlib, or use app password authentication."
-                )
-            
-            # Validate required paths for OAuth mode
-            if not token_path or not credentials_path:
-                raise GmailAuthError(
-                    "OAuth mode requires both token_path and credentials_path parameters"
-                )
-            
-            logger.info(f"[{agent_name}] Initialized Gmail client for {email_address} (OAuth 2.0)")
-    
-    def authenticate(self) -> Credentials:
-        """
-        Authenticate with Gmail using OAuth 2.0
-        
-        Returns:
-            Google OAuth credentials
-        
-        Raises:
-            GmailAuthError: If authentication fails
-        """
-        creds = None
-        
-        # Check if token file exists
-        if self.token_path.exists():
-            try:
-                logger.info(f"[{self.agent_name}] Loading existing OAuth tokens...")
-                with open(self.token_path, 'r') as token_file:
-                    token_data = json.load(token_file)
-                    creds = Credentials.from_authorized_user_info(token_data, self.SCOPES)
-            except Exception as e:
-                logger.warning(f"[{self.agent_name}] Failed to load tokens: {e}")
-                creds = None
-        
-        # Refresh or obtain new credentials
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                try:
-                    logger.info(f"[{self.agent_name}] Refreshing expired OAuth tokens...")
-                    creds.refresh(Request())
-                    logger.info(f"[{self.agent_name}] Tokens refreshed successfully")
-                except Exception as e:
-                    logger.error(f"[{self.agent_name}] Token refresh failed: {e}")
-                    creds = None
-            
-            if not creds:
-                # Need new authorization
-                if not self.credentials_path.exists():
-                    raise GmailAuthError(
-                        f"OAuth credentials not found: {self.credentials_path}\n"
-                        f"See docs/google_calendar_setup.md for setup instructions"
-                    )
-                
-                try:
-                    logger.info(f"[{self.agent_name}] Starting OAuth authorization flow...")
-                    logger.info(
-                        f"[{self.agent_name}] Running in headless mode - please authorize via URL"
-                    )
-                    
-                    flow = InstalledAppFlow.from_client_secrets_file(
-                        str(self.credentials_path),
-                        self.SCOPES
-                    )
-                    
-                    # Manual OAuth flow for headless servers
-                    # Generate authorization URL
-                    flow.redirect_uri = 'urn:ietf:wg:oauth:2.0:oob'  # Out-of-band mode
-                    auth_url, _ = flow.authorization_url(prompt='consent')
-                    
-                    # Print URL for user to visit
-                    print("\n" + "="*70)
-                    print("OAUTH AUTHORIZATION REQUIRED")
-                    print("="*70)
-                    print("\nPlease visit this URL to authorize this application:")
-                    print(f"\n{auth_url}\n")
-                    print("After authorizing, you will receive an authorization code.")
-                    print("="*70 + "\n")
-                    
-                    # Prompt for authorization code
-                    auth_code = input("Enter the authorization code: ").strip()
-                    
-                    # Exchange code for credentials
-                    flow.fetch_token(code=auth_code)
-                    creds = flow.credentials
-                    
-                    logger.info(f"[{self.agent_name}] Authorization successful!")
-                
-                except Exception as e:
-                    raise GmailAuthError(f"OAuth authorization failed: {e}")
-            
-            # Save credentials for future use
-            try:
-                self.token_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(self.token_path, 'w') as token_file:
-                    token_file.write(creds.to_json())
-                logger.info(f"[{self.agent_name}] OAuth tokens saved to {self.token_path}")
-                
-                # Set restrictive permissions
-                os.chmod(self.token_path, 0o600)
-            
-            except Exception as e:
-                logger.warning(f"[{self.agent_name}] Failed to save tokens: {e}")
-        
-        self.credentials = creds
-        return creds
+        logger.info(f"[{agent_name}] Initialized Gmail client for {email_address} (App Password)")
     
     def connect(self):
         """
-        Connect to Gmail IMAP server using configured authentication method
+        Connect to Gmail IMAP server using app password
         
         Raises:
             GmailConnectionError: If connection fails
@@ -211,84 +62,14 @@ class GmailClient:
             logger.info(f"[{self.agent_name}] Connecting to Gmail IMAP...")
             self.imap = imaplib.IMAP4_SSL(self.IMAP_SERVER, self.IMAP_PORT)
             
-            if self.auth_method == "app_password":
-                # Simple IMAP login with app password
-                logger.debug(f"[{self.agent_name}] Authenticating with app password...")
-                self.imap.login(self.email_address, self.app_password)
-                logger.info(f"[{self.agent_name}] Connected to Gmail IMAP successfully (App Password)")
+            # Simple IMAP login with app password
+            logger.debug(f"[{self.agent_name}] Authenticating with app password...")
+            self.imap.login(self.email_address, self.app_password)
+            logger.info(f"[{self.agent_name}] Connected to Gmail IMAP successfully (App Password)")
                 
-            elif self.auth_method == "oauth":
-                # OAuth authentication
-                if not self.credentials:
-                    self.authenticate()
-                
-                # Authenticate with OAuth (XOAUTH2)
-                auth_string = self._generate_oauth_string()
-                try:
-                    self.imap.authenticate('XOAUTH2', lambda x: auth_string)
-                except imaplib.IMAP4.error as e:
-                    # Check for authentication failure
-                    error_msg = str(e)
-                    if "Invalid credentials" in error_msg or "AUTHENTICATIONFAILED" in error_msg:
-                        logger.warning(f"[{self.agent_name}] Authentication failed (token likely expired), forcing refresh...")
-                        
-                        # Close the failed connection
-                        try:
-                            self.imap.logout()
-                        except:
-                            pass
-                        self.imap = None
-                        
-                        # Force refresh by marking credentials as expired
-                        if self.credentials and self.credentials.refresh_token:
-                            try:
-                                self.credentials.refresh(Request())
-                                logger.info(f"[{self.agent_name}] Tokens refreshed successfully")
-                                
-                                # Save new tokens
-                                self._save_tokens()
-                                
-                                # Create NEW connection and retry authentication
-                                logger.info(f"[{self.agent_name}] Creating new IMAP connection for retry...")
-                                self.imap = imaplib.IMAP4_SSL(self.IMAP_SERVER, self.IMAP_PORT)
-                                auth_string = self._generate_oauth_string()
-                                self.imap.authenticate('XOAUTH2', lambda x: auth_string)
-                                logger.info(f"[{self.agent_name}] Re-authentication successful")
-                                logger.info(f"[{self.agent_name}] Connected to Gmail IMAP successfully (OAuth)")
-                                return
-                            except Exception as refresh_error:
-                                logger.error(f"[{self.agent_name}] Token refresh failed during reconnect: {refresh_error}")
-                                raise GmailAuthError(f"Authentication failed and token refresh failed: {refresh_error}")
-                    
-                    # Re-raise if not handled
-                    raise
-                
-                logger.info(f"[{self.agent_name}] Connected to Gmail IMAP successfully (OAuth)")
-        
         except Exception as e:
             raise GmailConnectionError(f"Failed to connect to Gmail: {e}")
 
-    def _save_tokens(self):
-        """Helper to save credentials to file"""
-        try:
-            self.token_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.token_path, 'w') as token_file:
-                token_file.write(self.credentials.to_json())
-            logger.info(f"[{self.agent_name}] OAuth tokens saved to {self.token_path}")
-            os.chmod(self.token_path, 0o600)
-        except Exception as e:
-            logger.warning(f"[{self.agent_name}] Failed to save tokens: {e}")
-    
-    def _generate_oauth_string(self) -> bytes:
-        """
-        Generate OAuth 2.0 authentication string for IMAP
-        
-        Returns:
-            Raw OAuth bytes (imaplib will base64-encode it)
-        """
-        # XOAUTH2 format: user=<email>\x01auth=Bearer <token>\x01\x01
-        auth_string = f"user={self.email_address}\x01auth=Bearer {self.credentials.token}\x01\x01"
-        return auth_string.encode('utf-8')
     
     def disconnect(self):
         """Disconnect from IMAP server"""

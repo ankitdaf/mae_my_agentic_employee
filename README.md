@@ -4,14 +4,13 @@ An intelligent, lightweight email processing agent designed for the RK3566 singl
 
 ## Features
 
-- **Gmail Integration**: Support for both **App Passwords** (recommended) and OAuth 2.0 authentication.
+- **Gmail Integration**: Secure support for **App Passwords** via system keyring.
 - **AI Classification**: Categorize emails as Transactions, Feed, Promotions, or Inbox (with NPU-accelerated MobileBERT support)
 - **Smart Deletion**: Automatically manage promotional emails with configurable actions (Move to Trash or Apply Label)
 - **Topic Matching**: Preserve promotional emails that match your specific interests
 - **Sender Management**: Whitelist/blacklist with wildcard pattern support
 - **Attachment Handling**: Save important attachments with deduplication
-- **Calendar Integration**: Extract events from emails and add to Google Calendar
-- **Web UI Dashboard**: Manage agents, update configurations, and securely store credentials via a web interface
+- **Web UI Dashboard**: Manage agents and securely store credentials via a web interface
 - **Historical Processing**: Bulk process and label older emails based on AI classification
 - **Resource Management**: File-based token system prevents resource contention on RK3566
 - **Dry-Run Mode**: Test classification and actions before making any changes
@@ -23,22 +22,29 @@ MAE uses a **multi-process architecture** managed by an orchestrator, with a web
 ```
 MAE System
 ├── Orchestrator (Main Loop)
-│   ├── Email Agent (fetches, classifies, acts on emails)
-│   ├── Calendar Agent (future)
-│   └── OneDrive Agent (future)
+│   └── Email Agent (fetches, classifies, acts on emails)
 └── Web UI Dashboard (FastAPI + Vanilla JS)
 ```
 
-Resource tokens (NPU, IMAP, CALENDAR) prevent concurrent access to shared resources.
+Resource tokens (NPU, IMAP) prevent concurrent access to shared resources.
 
 ## Quick Start
+
+### Secure Credential Management (Recommended)
+
+Instead of storing passwords in plaintext configuration files, you can store them securely in the system keyring (or an encrypted fallback file) using the provided setup script:
+
+```bash
+python3 scripts/setup_credentials.py --agent personal --service gmail
+```
+
+The script will prompt you for your email and app password. Once stored, you can safely remove the `app_password` field from your `personal.yaml` file.
 
 ### Prerequisites
 
 1. **RK3566 Device** (or development machine for testing)
 2. **Python 3.8+**
-3. **Gmail Account** with an App Password or OAuth credentials (see **[App Password Guide](docs/gmail_app_password_setup.md)** for the easiest method)
-4. **Google Calendar** (optional, for calendar integration)
+3. **Gmail Account** with an App Password (see **[App Password Guide](docs/gmail_app_password_setup.md)**)
 
 ### Installation
 
@@ -57,8 +63,12 @@ mkdir -p logs data config/secrets
 ### Configuration
 
 1. **Setup Authentication**:
-   - **Option 1 (Easiest)**: Follow the **[App Password Setup Guide](docs/gmail_app_password_setup.md)** to generate a password and enter it via the Web UI.
-   - **Option 2 (Advanced)**: Follow the **[OAuth Setup Guide](docs/oauth_setup.md)** to create a Google Cloud project and get a `gmail_credentials.json` file.
+   - **Option 1 (Secure - Recommended)**: Use the credential setup script:
+     ```bash
+     python3 scripts/setup_credentials.py --agent personal --service gmail
+     ```
+   - **Option 2 (Simple)**: Enter the app password directly in `config/agents/personal.yaml` (less secure).
+   - **Option 3 (OAuth)**: Follow the **[OAuth Setup Guide](docs/oauth_setup.md)** to create a Google Cloud project and get a `gmail_credentials.json` file.
 
 2. **Create Agent Config**:
    ```bash
@@ -217,18 +227,6 @@ blacklisted_senders:
   - "spam@marketing.com"
   - "*@spammers.com"
 ```
-
-### Calendar Integration
-
-MAE extracts calendar events from emails using regex patterns:
-
-Supported formats:
-- "Meeting on Monday, Dec 25 at 3:00 PM"
-- "Tomorrow at 2:00 PM"
-- "Next Monday at 10:00 AM"
-- "December 25, 2024 at 3:00 PM"
-
-Extracted events are automatically added to Google Calendar with deduplication.
 
 ## Project Structure
 

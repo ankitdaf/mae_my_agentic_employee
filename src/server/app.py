@@ -1,7 +1,6 @@
 import os
 import yaml
 import logging
-import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional
 from fastapi import FastAPI, HTTPException, BackgroundTasks
@@ -9,9 +8,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import json
-from google_auth_oauthlib.flow import Flow
-from google.oauth2.credentials import Credentials
-from google.auth.transport.requests import Request
 
 # Setup logging
 logger = logging.getLogger("mae_server")
@@ -34,9 +30,6 @@ class AgentConfig(BaseModel):
 
 class DryRunRequest(BaseModel):
     target_labels: Optional[str] = None
-
-class AuthCodeRequest(BaseModel):
-    code: str
 
 class AppPasswordRequest(BaseModel):
     email: str

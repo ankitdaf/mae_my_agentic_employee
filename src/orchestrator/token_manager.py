@@ -21,7 +21,6 @@ class TokenType(Enum):
     """Types of resource tokens"""
     NPU = "npu"              # NPU model inference
     IMAP = "imap"            # IMAP connection (to avoid rate limits)
-    CALENDAR = "calendar"    # Google Calendar API
     GENERAL = "general"      # General processing token
 
 

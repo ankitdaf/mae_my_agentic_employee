@@ -31,18 +31,28 @@ class EmailAgent:
         from src.agents.email import GmailClient, EmailParser, EmailStorage
         from src.agents.classifier import EmailClassifier, TopicMatcher, SenderManager
         from src.agents.actions import EmailDeleter
-        from src.agents.calendar import CalendarExtractor, GCalClient
+        from src.utils.credential_manager import CredentialManager
         
-        # Initialize components
         # Get Gmail credentials path (default to config/secrets/gmail_credentials.json)
         gmail_creds = config.get('email', 'credentials_path')
         gmail_creds_path = Path(gmail_creds) if gmail_creds else Path('config/secrets/gmail_credentials.json')
         
+        # Try to get app password from secure storage first
+        service_creds = CredentialManager.get_credential(self.agent_name, 'gmail')
+        app_password = None
+        if service_creds and 'password' in service_creds:
+            app_password = service_creds['password']
+            logger.info(f"[{self.agent_name}] Using Gmail app password from secure storage")
+        else:
+            # Fallback to config
+            app_password = config.get('email', 'app_password')
+            if app_password:
+                logger.warning(f"[{self.agent_name}] Using Gmail app password from plaintext config. Consider using scripts/setup_credentials.py for better security.")
+
         self.gmail_client = GmailClient(
             email_address=config.get('email', 'address'),
-            token_path=config.oauth_token_path,
-            credentials_path=gmail_creds_path,
-            agent_name=self.agent_name
+            agent_name=self.agent_name,
+            app_password=app_password
         )
         
         self.email_parser = EmailParser(self.agent_name)
@@ -71,24 +81,6 @@ class EmailAgent:
             config=config.get('deletion'),
             agent_name=self.agent_name
         )
-        
-        # Calendar components (optional)
-        self.calendar_enabled = config.get('calendar', 'enabled', False)
-        if self.calendar_enabled:
-            self.calendar_extractor = CalendarExtractor(self.agent_name)
-            
-            # Get calendar credentials path (default to config/secrets/gcal_credentials.json)
-            gcal_creds = config.get('calendar', 'credentials_path')
-            gcal_creds_path = Path(gcal_creds) if gcal_creds else Path('config/secrets/gcal_credentials.json')
-            
-            self.gcal_client = GCalClient(
-                credentials_path=gcal_creds_path,
-                token_path=config.agent_data_dir / 'calendar_tokens.json',
-                agent_name=self.agent_name
-            )
-        else:
-            self.calendar_extractor = None
-            self.gcal_client = None
         
         # Dry-run mode (prevents actual email actions)
         self.dry_run = config.get('deletion', 'dry_run', True)
@@ -418,35 +410,6 @@ class EmailAgent:
             )
             return None
     
-
-    def _extract_and_create_events(self, email_data: Dict[str, Any]):
-        """Extract and create calendar events"""
-        if not self.calendar_extractor or not self.gcal_client:
-            return
-        
-        # Extract events
-        events = self.calendar_extractor.extract_events(email_data)
-        
-        if not events:
-            return
-        
-        logger.info(f"[{self.agent_name}]   Extracted {len(events)} calendar event(s)")
-        
-        # Create events in Google Calendar
-        from src.orchestrator import TokenType
-        
-        with self.token_manager.token(TokenType.CALENDAR, self.agent_name):
-            with self.gcal_client as calendar:
-                for event in events:
-                    # Check for duplicates
-                    if not calendar.event_exists(event):
-                        event_id = calendar.create_event(event)
-                        logger.info(
-                            f"[{self.agent_name}]   Created event: {event['title']}"
-                        )
-                        logger.info(
-                            f"[{self.agent_name}]   Event already exists: {event['title']}"
-                        )
 
     def process_historical_emails(self, start_date: str, end_date: str, target_categories: List[str]):
         """

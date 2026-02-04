@@ -20,15 +20,8 @@ const newAgentModal = document.getElementById('new-agent-modal');
 const createAgentBtn = document.getElementById('create-agent-btn');
 const newAgentNameInput = document.getElementById('new-agent-name');
 
-const authBtn = document.getElementById('auth-btn');  // Keep for legacy OAuth if needed
 const appPasswordBtn = document.getElementById('app-password-btn');
-
 const authStatusText = document.getElementById('auth-status-text');
-const authModal = document.getElementById('auth-modal');
-const authUrlLink = document.getElementById('auth-url');
-const authCodeInput = document.getElementById('auth-code');
-const submitAuthCodeBtn = document.getElementById('submit-auth-code');
-
 const appPasswordModal = document.getElementById('app-password-modal');
 const saveAppPasswordBtn = document.getElementById('save-app-password-btn');
 const testConnectionBtn = document.getElementById('test-connection-btn');
@@ -247,16 +240,8 @@ async function checkAuthStatus(name) {
             return;
         }
 
-        // Fallback to OAuth check
-        const res = await fetch(`${API_BASE}/auth/status/${name}`);
-        const data = await res.json();
-        if (data.valid) {
-            authStatusText.textContent = 'OAuth Authenticated';
-            authStatusText.style.color = 'var(--success)';
-        } else {
-            authStatusText.textContent = 'Authentication Required';
-            authStatusText.style.color = 'var(--danger)';
-        }
+        authStatusText.textContent = 'Authentication Required';
+        authStatusText.style.color = 'var(--danger)';
     } catch (err) {
         console.error('Auth check failed:', err);
         authStatusText.textContent = 'Status Unknown';
@@ -350,46 +335,7 @@ async function testConnection() {
     }
 }
 
-// Initiate Auth
-async function initiateAuth() {
-    if (!currentAgent) return;
-
-    try {
-        const res = await fetch(`${API_BASE}/auth/initiate/${currentAgent}`, { method: 'POST' });
-        const data = await res.json();
-
-        authUrlLink.href = data.auth_url;
-        authModal.classList.remove('hidden');
-    } catch (err) {
-        alert('Failed to initiate authentication');
-    }
-}
-
-// Submit Auth Code
-async function submitAuthCode() {
-    const code = authCodeInput.value.trim();
-    if (!code) return;
-
-    try {
-        const res = await fetch(`${API_BASE}/auth/complete/${currentAgent}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code })
-        });
-
-        if (res.ok) {
-            alert('Authentication successful!');
-            authModal.classList.add('hidden');
-            authCodeInput.value = '';
-            checkAuthStatus(currentAgent);
-        } else {
-            const err = await res.json();
-            alert(`Error: ${err.detail}`);
-        }
-    } catch (err) {
-        alert('Failed to complete authentication');
-    }
-}
+// (OAuth functions removed)
 
 // Create Agent
 async function createAgent() {
@@ -456,9 +402,6 @@ function setupEventListeners() {
     if (createAgentBtn) createAgentBtn.onclick = createAgent;
     if (saveBtn) saveBtn.onclick = saveConfig;
     if (deleteBtn) deleteBtn.onclick = deleteAgent;
-
-    if (authBtn) authBtn.onclick = initiateAuth;
-    if (submitAuthCodeBtn) submitAuthCodeBtn.onclick = submitAuthCode;
 
     // App Password buttons
     if (appPasswordBtn) appPasswordBtn.onclick = openAppPasswordModal;
