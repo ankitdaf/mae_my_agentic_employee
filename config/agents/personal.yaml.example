@@ -12,8 +12,10 @@ agent:
 email:
   provider: "gmail"                   # Currently only 'gmail' is supported
   address: "your-email@gmail.com"     # Your Gmail address
-  # OAuth tokens will be stored in: data/personal/oauth_tokens.json
-
+  # Option 1: App Password (recommended for servers)
+  # Generate at: https://myaccount.google.com/apppasswords
+  # app_password: "xxxx xxxx xxxx xxxx"
+  
 classification:
   use_ai_model: true
   model_path: "models/email_classifier.rknn"

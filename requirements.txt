@@ -5,10 +5,6 @@ pyyaml>=6.0                          # YAML configuration parsing
 python-dateutil>=2.8.2               # Date parsing utilities
 
 # Email processing
-google-auth>=2.25.0                  # Google OAuth 2.0 (TODO: Remove after migration)
-google-auth-oauthlib>=1.2.0          # OAuth flow helpers (TODO: Remove after migration)
-google-auth-httplib2>=0.2.0          # HTTP transport for auth
-google-api-python-client>=2.110.0    # Google Calendar API
 email-validator>=2.1.0               # Email address validation
 keyring>=24.0.0                      # Secure credential storage
 cryptography>=41.0.0                 # Fallback encryption for credentials
