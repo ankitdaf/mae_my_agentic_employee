@@ -1,3 +1,12 @@
+"""
+Gmail Client for MAE
+
+Handles Gmail authentication (App Password) and IMAP operations.
+Supports fetching, marking, and deleting emails.
+"""
+
+import os
+import json
 import imaplib
 import email
 from email.header import decode_header

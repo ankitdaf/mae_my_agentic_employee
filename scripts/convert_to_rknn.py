@@ -46,16 +46,27 @@ import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 import json
 
+import argparse
+
+# Setup argument parser
+parser = argparse.ArgumentParser(description='Convert trained MobileBERT model to RKNN format')
+parser.add_argument('--model-path', type=str, default="./models/email_classifier_pytorch",
+                    help='Path to the trained PyTorch/Safetensors model directory')
+parser.add_argument('--output', type=str, default="./models/email_classifier.rknn",
+                    help='Path to save the converted RKNN model')
+parser.add_argument('--calibration-data', type=str, default='data/training/email_dataset_20251207_001715.json',
+                    help='Path to JSON dataset for quantization calibration')
+args = parser.parse_args()
+
 print("="*60)
 print("MobileBERT to RKNN Conversion Script")
 print("="*60)
 
 # Load trained model
-print("\n[1/7] Loading trained model...")
-model_path = "./models/email_classifier_pytorch"
+print(f"\n[1/7] Loading trained model from {args.model_path}...")
 try:
-    model = AutoModelForSequenceClassification.from_pretrained(model_path)
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    model = AutoModelForSequenceClassification.from_pretrained(args.model_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
     model.eval()
     print("✓ Model loaded successfully")
 except Exception as e:
@@ -106,16 +117,26 @@ except Exception as e:
 # Prepare calibration dataset for quantization
 print("\n[4/7] Preparing calibration dataset...")
 try:
-    with open('data/training/email_dataset_20251207_001715.json', 'r') as f:
+    with open(args.calibration_data, 'r') as f:
         data = json.load(f)
     
-    # Take 100 samples for calibration
-    calibration_samples = data['emails'][:100]
+    if isinstance(data, list):
+        calibration_samples = data[:100]
+    elif isinstance(data, dict):
+        calibration_samples = data.get('emails', [])[:100]
+    else:
+        raise ValueError(f"Unexpected JSON format in {args.calibration_data}")
     
     # Prepare calibration data
     def prepare_input(email):
+        # If input is already prepared (e.g. from debug logs)
+        if 'input_string' in email:
+            return email['input_string']
+            
         subject = email.get('subject', '')
-        sender = f"{email.get('sender_name', '')} <{email.get('sender_email', '')}>"
+        sender_name = email.get('sender_name', '')
+        sender_email = email.get('sender_email', '')
+        sender = f"{sender_name} <{sender_email}>" if sender_name else sender_email
         body = email.get('body_text', '')[:1000]
         return f"[SUBJECT] {subject} [SENDER] {sender} [BODY] {body}"
     
@@ -180,7 +201,7 @@ if ret != 0:
 print("✓ RKNN model built")
 
 # Export
-ret = rknn.export_rknn('./models/email_classifier.rknn')
+ret = rknn.export_rknn(args.output)
 if ret != 0:
     print('✗ Export RKNN model failed!')
     sys.exit(ret)

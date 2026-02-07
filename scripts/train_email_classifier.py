@@ -52,6 +52,12 @@ def prepare_input(email: Dict) -> str:
     Returns:
         Concatenated input string
     """
+    # If input is already prepared (e.g. from debug logs)
+    if 'input_string' in email:
+        return email['input_string']
+    if 'text' in email:
+        return email['text']
+
     subject = email.get('subject', '')
     sender_name = email.get('sender_name', '')
     sender_email = email.get('sender_email', '')
@@ -81,9 +87,16 @@ def load_dataset(dataset_path: Path) -> List[Dict]:
     if dataset_path.suffix.lower() == '.json':
         with open(dataset_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
-        emails = data['emails']
-        if 'metadata' in data and 'by_label' in data['metadata']:
-            logger.info(f"  By label: {data['metadata']['by_label']}")
+        
+        if isinstance(data, list):
+            emails = data
+        elif isinstance(data, dict):
+            emails = data.get('emails', [])
+            if 'metadata' in data and 'by_label' in data['metadata']:
+                logger.info(f"  By label: {data['metadata']['by_label']}")
+        else:
+            logger.error(f"Unexpected JSON format in {dataset_path}")
+            return []
             
     elif dataset_path.suffix.lower() == '.csv':
         import csv
