@@ -90,8 +90,6 @@ class EmailAgent:
     def run(self):
         """Run the email processing agent"""
         from datetime import datetime
-        import csv
-        from pathlib import Path
         
         logger.info(f"[{self.agent_name}] Starting email agent run")
         
@@ -103,41 +101,96 @@ class EmailAgent:
             'promotions': 0,
             'inbox': 0
         }
+        total_processed = 0
         
         try:
             # Acquire IMAP token and connect once for the entire run
             from src.orchestrator import TokenType
             with self.token_manager.token(TokenType.IMAP, self.agent_name):
                 with self.gmail_client as client:
-                    # Step 1: Fetch emails
-                    emails = self._fetch_emails(client)
-                    logger.info(f"[{self.agent_name}] Fetched {len(emails)} new emails")
                     
-                    if not emails:
-                        logger.info(f"[{self.agent_name}] No new emails to process")
-                        # Log even if no emails processed
+                    # Get fetch parameters
+                    limit = self.config.get('email', 'fetch_limit', 100)
+                    unread_only = self.config.get('email', 'unread_only', True)
+                    since_days = self.config.get('email', 'since_days', 7)
+                    
+                    # Get latest processed info for incremental fetching
+                    latest_info = self.email_storage.get_latest_email_info()
+                    last_dt = latest_info.get('date_parsed')
+                    
+                    if last_dt:
+                        # Adjust since_days based on watermark
+                        days_since = (ensure_aware(datetime.now()) - ensure_aware(last_dt)).days + 1
+                        since_days = max(since_days, days_since)
+                        logger.info(f"[{self.agent_name}] Using watermark: last processed email from {last_dt.strftime('%Y-%m-%d')}, using since_days={since_days}")
+                    
+                    # Step 1: Fetch headers (Batch headers is fast and efficient)
+                    headers = client.fetch_headers(
+                        limit=limit,
+                        unread_only=unread_only,
+                        since_days=since_days
+                    )
+                    
+                    if not headers:
+                        logger.info(f"[{self.agent_name}] No matching emails found on server")
                         self._log_run_stats(start_time, datetime.now(), 0, category_counts)
                         return
+
+                    logger.info(f"[{self.agent_name}] Found {len(headers)} potential emails to process")
                     
-                    # Step 2: Process each email
-                    for email_data in emails:
+                    # Step 2: Iterative Process (Fetch -> Classify -> Action per email)
+                    # This is resilient to interruptions as each email is fully handled
+                    from email.utils import parsedate_to_datetime
+                    
+                    for header in headers:
+                        email_id = header['id']
+                        email_hash = self.email_parser._compute_hash(header['message_id'])
+                        
+                        # 1. Check if already processed
+                        if self.email_storage.email_exists(email_hash):
+                            logger.debug(f"[{self.agent_name}] Skipping already processed: {header['subject']}")
+                            continue
+                            
+                        # 2. Check if significantly older than watermark to allow for out-of-order delivery
+                        try:
+                            email_dt = ensure_aware(parsedate_to_datetime(header['date']))
+                            if last_dt and (ensure_aware(last_dt) - email_dt).days > 2:
+                                logger.debug(f"[{self.agent_name}] Skipping significantly older email: {header['subject']}")
+                                continue
+                        except Exception:
+                            pass
+                            
+                        # 3. Fetch full content
+                        logger.info(f"[{self.agent_name}] Fetching: {header['subject']}")
+                        raw_email_data = client.fetch_full_email(email_id)
+                        if not raw_email_data:
+                            logger.warning(f"[{self.agent_name}] Failed to fetch content for {email_id}")
+                            continue
+                            
+                        # 4. Parse and Save (Save updates state internally)
+                        email_data = self.email_parser.parse(raw_email_data)
+                        self.email_storage.save_email(email_data, "new")
+                        
+                        # 5. Process (Classify + Action)
                         category = self._process_email(email_data, client)
+                        
                         if category:
+                            total_processed += 1
                             category_counts[category] = category_counts.get(category, 0) + 1
-                            # Update watermark only after successful processing
+                            # 6. Update watermark IMMEDIATELY after successful processing
+                            # This ensures if we crash, we don't re-process this email
                             self.email_storage.update_watermark(email_data)
-            
+                    
             # Step 3: Summary
             stats = self.email_storage.get_stats()
             logger.info(
-                f"[{self.agent_name}] Run complete. "
-                f"Total emails: {stats['total_emails']}, "
-                f"By state: {stats['by_state']}"
+                f"[{self.agent_name}] Run complete. Processed {total_processed} emails. "
+                f"Total in history: {stats['total_emails']}"
             )
             
             # Log run statistics
             end_time = datetime.now()
-            self._log_run_stats(start_time, end_time, len(emails), category_counts)
+            self._log_run_stats(start_time, end_time, total_processed, category_counts)
         
         except Exception as e:
             logger.error(f"[{self.agent_name}] Agent run failed: {e}", exc_info=True)
@@ -183,101 +236,7 @@ class EmailAgent:
         except Exception as e:
             logger.warning(f"[{self.agent_name}] Failed to log run stats: {e}")
     
-    def _fetch_emails(self, client: Optional[Any] = None) -> List[Dict[str, Any]]:
-        """
-        Fetch and parse new emails
-        
-        Args:
-            client: Optional active GmailClient
-            
-        Returns:
-            List of parsed email dictionaries
-        """
-        from datetime import datetime
-        
-        # Use provided client or create a temporary one
-        if client:
-            return self._fetch_emails_internal(client)
-        
-        from src.orchestrator import TokenType
-        with self.token_manager.token(TokenType.IMAP, self.agent_name):
-            with self.gmail_client as client:
-                return self._fetch_emails_internal(client)
 
-    def _fetch_emails_internal(self, client: Any) -> List[Dict[str, Any]]:
-        """Internal implementation of _fetch_emails using an active client"""
-        from datetime import datetime
-        
-        # Get fetch parameters from config
-        limit = self.config.get('email', 'fetch_limit', 100)
-        unread_only = self.config.get('email', 'unread_only', True)
-        since_days = self.config.get('email', 'since_days', 7)
-        
-        # Get latest processed email info for incremental fetching
-        latest_info = self.email_storage.get_latest_email_info()
-        last_dt = latest_info.get('date_parsed')
-        
-        if last_dt:
-            # Calculate since_days to cover at least until the last processed email
-            # Add 1 day buffer to be safe
-            days_since = (ensure_aware(datetime.now()) - ensure_aware(last_dt)).days + 1
-            since_days = days_since
-            logger.info(f"[{self.agent_name}] Incremental fetch: last processed email from {last_dt.strftime('%Y-%m-%d')}, using since_days={since_days}")
-        
-        # Fetch only headers first
-        headers = client.fetch_headers(
-            limit=limit,
-            unread_only=unread_only,
-            since_days=since_days
-        )
-        # Parse and filter emails
-        
-        parsed_emails = []
-        skipped_count = 0
-        already_processed_count = 0
-        
-        from email.utils import parsedate_to_datetime
-        
-        for header in headers:
-            email_id = header['id']
-            email_hash = self.email_parser._compute_hash(header['message_id'])
-            
-            # Parse date from header
-            try:
-                email_dt = parsedate_to_datetime(header['date'])
-            except Exception:
-                email_dt = None
-            
-            # Check if older than or same as last processed
-            # Check if already processed (hash match)
-            if self.email_storage.email_exists(email_hash):
-                already_processed_count += 1
-                logger.debug(f"[{self.agent_name}] Skipping already processed email (hash match): {header['subject']}")
-                continue
-
-            # Check if older than last processed (with buffer)
-            if last_dt and email_dt:
-                email_dt = ensure_aware(email_dt)
-                last_dt = ensure_aware(last_dt)
-                # Only skip if significantly older (e.g. > 2 days) to allow for out-of-order delivery
-                if (last_dt - email_dt).days > 2:
-                    skipped_count += 1
-                    logger.debug(f"[{self.agent_name}] Skipping significantly older email (>2 days): {header['subject']} ({email_dt})")
-                    continue
-            
-            # If we reach here, we need the full email
-            logger.info(f"[{self.agent_name}] Fetching full content for: {header['subject']}")
-            raw_email = client.fetch_full_email(email_id)
-            if raw_email:
-                parsed = self.email_parser.parse(raw_email)
-                parsed_emails.append(parsed)
-                # Save to storage (updates latest email info)
-                self.email_storage.save_email(parsed, "new")
-        
-        if already_processed_count > 0 or skipped_count > 0:
-            logger.info(f"[{self.agent_name}] Filtered {already_processed_count} already processed and {skipped_count} older emails")
-        
-        return parsed_emails
     
     def _process_email(self, email_data: Dict[str, Any], client: Optional[Any] = None) -> str:
         """
