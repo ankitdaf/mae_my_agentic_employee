@@ -69,7 +69,7 @@ class GmailClient:
         """
         try:
             logger.info(f"[{self.agent_name}] Connecting to Gmail IMAP...")
-            self.imap = imaplib.IMAP4_SSL(self.IMAP_SERVER, self.IMAP_PORT)
+            self.imap = imaplib.IMAP4_SSL(self.IMAP_SERVER, self.IMAP_PORT, timeout=30)
             
             # Simple IMAP login with app password
             logger.debug(f"[{self.agent_name}] Authenticating with app password...")
